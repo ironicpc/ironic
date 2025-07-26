@@ -1,6 +1,5 @@
 $discordWebhookUrl = "https://canary.discord.com/api/webhooks/1398516626248175676/N02m9QOcRf7SwbEfA1I1Uo7Rqucg_doYHv7LH00PUIXblN2fzJ3axUk-FlpiVvJHdwfD"
 
-# Global variables for Discord logging
 $global:discordEmbeds = @()
 $global:discordLogContent = @()
 $computerName = $env:COMPUTERNAME
@@ -93,7 +92,7 @@ Write-Host ""
 Write-Host ""
 
 $name = Read-Host -Prompt "Type your name here"
-$logFileName = "$name`_Log.txt"
+$logFileName = "$($name)_Log.txt"
 
 Clear-Host
 
@@ -101,25 +100,24 @@ Clear-Host
 Send-DiscordEmbed -title "System Check Started" -description @"
 **User**: $name
 **Computer**: $computerName
-**IP Address**: $ipAddress
 **OS**: $($osInfo.Caption) ($($osInfo.OSArchitecture))
 **Time**: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 "@ -color "65280" # Green color
 
 Send-DiscordMessage
 
-Add-DiscordLog "Hello, $name! The script is now starting..." -section "Startup"
+Add-DiscordLog -message "Hello, $name! The script is now starting..." -section "Startup"
 
 function Get-OneDrivePath {
     $oneDrivePath = (Get-ItemProperty "HKCU:\Software\Microsoft\OneDrive" -Name "UserFolder" -ErrorAction SilentlyContinue).UserFolder
     if (-not $oneDrivePath) {
-        Add-DiscordLog "OneDrive path not found in registry. Attempting alternative detection..." -section "OneDrive"
+        Add-DiscordLog -message "OneDrive path not found in registry. Attempting alternative detection..." -section "OneDrive"
         $envOneDrive = [System.IO.Path]::Combine($env:UserProfile, "OneDrive")
         if (Test-Path $envOneDrive) {
             $oneDrivePath = $envOneDrive
-            Add-DiscordLog "OneDrive path detected using environment variable: $oneDrivePath" -section "OneDrive"
+            Add-DiscordLog -message "OneDrive path detected using environment variable: $oneDrivePath" -section "OneDrive"
         } else {
-            Add-DiscordLog "Unable to find OneDrive path automatically." -section "OneDrive"
+            Add-DiscordLog -message "Unable to find OneDrive path automatically." -section "OneDrive"
             return $null
         }
     }
@@ -132,7 +130,7 @@ function Format-Output {
 }
 
 function Find-RarAndExeFiles {
-    Add-DiscordLog "Finding .rar and .exe files..." -section "FileScan"
+    Add-DiscordLog -message "Finding .rar and .exe files..." -section "FileScan"
     $desktopPath = [System.Environment]::GetFolderPath('Desktop')
     $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
     $oneDriveFileHeader = "`n-----------------`nOneDrive Files:`n"
@@ -172,9 +170,9 @@ function Find-RarAndExeFiles {
             if ($_) { Add-Content -Path $outputFile -Value $_ }
         }
         
-        Add-DiscordLog "Found $($allFiles.Count) files (.rar and .exe)" -section "FileScan"
+        Add-DiscordLog -message "Found $($allFiles.Count) files (.rar and .exe)" -section "FileScan"
         if ($oneDriveFiles.Count -gt 0) {
-            Add-DiscordLog "Found $($oneDriveFiles.Count) files in OneDrive" -section "FileScan"
+            Add-DiscordLog -message "Found $($oneDriveFiles.Count) files in OneDrive" -section "FileScan"
         }
     }
     finally {
@@ -599,9 +597,9 @@ function Log-R6AndSteamBanStatus {
 # Main execution
 $oneDrivePath = Get-OneDrivePath
 if ($oneDrivePath) {
-    Add-DiscordLog "OneDrive path: $oneDrivePath" -section "OneDrive"
+    Add-DiscordLog -message "OneDrive path: $oneDrivePath" -section "OneDrive"
 } else {
-    Add-DiscordLog "OneDrive path could not be determined." -section "OneDrive"
+    Add-DiscordLog -message "OneDrive path could not be determined." -section "OneDrive"
 }
 
 # Execute all functions
@@ -692,4 +690,4 @@ Send-DiscordEmbed -title "System Check Completed" -description @"
 # Send any remaining logs
 Send-DiscordLog
 
-Add-DiscordLog "Script execution completed." -section "Completion"
+Add-DiscordLog -message "Script execution completed." -section "Completion"
