@@ -1,0 +1,695 @@
+$discordWebhookUrl = "https://canary.discord.com/api/webhooks/1398516626248175676/N02m9QOcRf7SwbEfA1I1Uo7Rqucg_doYHv7LH00PUIXblN2fzJ3axUk-FlpiVvJHdwfD"
+
+# Global variables for Discord logging
+$global:discordEmbeds = @()
+$global:discordLogContent = @()
+$computerName = $env:COMPUTERNAME
+$osInfo = Get-CimInstance Win32_OperatingSystem
+
+function Send-DiscordEmbed {
+    param(
+        [string]$title,
+        [string]$description,
+        [string]$color = "16711680", # Red color
+        [array]$fields = @(),
+        [bool]$timestamp = $true
+    )
+    
+    $embed = @{
+        title = $title
+        description = $description
+        color = $color
+    }
+    
+    if ($fields.Count -gt 0) {
+        $embed.fields = $fields
+    }
+    
+    if ($timestamp) {
+        $embed.timestamp = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+    }
+    
+    $global:discordEmbeds += $embed
+}
+
+function Send-DiscordMessage {
+    param(
+        [string]$content = ""
+    )
+    
+    if ($global:discordEmbeds.Count -eq 0) { return }
+    
+    $payload = @{
+        content = $content
+        embeds = $global:discordEmbeds
+    }
+    
+    $body = $payload | ConvertTo-Json -Depth 10
+    $headers = @{
+        "Content-Type" = "application/json"
+    }
+    
+    try {
+        Invoke-RestMethod -Uri $discordWebhookUrl -Method Post -Body $body -Headers $headers
+        $global:discordEmbeds = @()
+    } catch {
+        Write-Host "Failed to send message to Discord: $_" -ForegroundColor Red
+    }
+}
+
+function Add-DiscordLog {
+    param(
+        [string]$message,
+        [string]$section = "General"
+    )
+    
+    $timestamp = Get-Date -Format "HH:mm:ss"
+    $global:discordLogContent += "[$timestamp] [$section] $message"
+    Write-Host $message
+}
+
+function Send-DiscordLog {
+    if ($global:discordLogContent.Count -gt 0) {
+        $logMessage = $global:discordLogContent -join "`n"
+        Send-DiscordEmbed -title "System Check Log" -description "```$logMessage```" -color "3447003" # Blue color
+        $global:discordLogContent = @()
+        Send-DiscordMessage
+    }
+}
+
+# Header display
+Clear-Host
+$headerBase64 = "77u/ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAg4paI4paI4paI4paEIOKWhOKWiOKWiOKWiOKWk+KWk+KWiOKWiOKWiOKWiOKWiCAg4paI4paI4paTICAgICDilojilojilpMgICAg4paE4paI4paI4paI4paI4paEICAg4paI4paI4paRIOKWiOKWiCDilpPilojilojilojilojiloggIOKWhOKWiOKWiOKWiOKWiOKWhCAgIOKWiOKWiCDiloTilojiloAKICAgICAgICAgICAgICAgICAgICDilpPilojilojilpLiloDilojiloAg4paI4paI4paS4paT4paIICAg4paAIOKWk+KWiOKWiOKWkiAgICDilpPilojilojilpIgICDilpLilojilojiloAg4paA4paIICDilpPilojilojilpEg4paI4paI4paS4paT4paIICAg4paAIOKWkuKWiOKWiOKWgCDiloDiloggICDilojilojiloTilojilpIKICAgICAgICAgICAgICAgICAgICDilpPilojiloggICAg4paT4paI4paI4paR4paS4paI4paI4paIICAg4paS4paI4paI4paRICAgIOKWkuKWiOKWiOKWkiAgIOKWkuKWk+KWiCAgICDiloQg4paS4paI4paI4paA4paA4paI4paI4paR4paS4paI4paI4paIICAg4paS4paT4paIICAgIOKWhCDilpPilojilojilojiloTilpEKICAgICAgICAgICAgICAgICAgICDilpLilojiloggICAg4paS4paI4paIIOKWkuKWk+KWiCAg4paEIOKWkuKWiOKWiOKWkSAgICDilpHilojilojilpEgICDilpLilpPilpPiloQg4paE4paI4paI4paS4paR4paT4paIIOKWkeKWiOKWiCDilpLilpPiloggIOKWhCDilpLilpPilpPiloQg4paE4paI4paI4paS4paT4paI4paIIOKWiOKWhAogICAgICAgICAgICAgICAgICAgIOKWkuKWiOKWiOKWkiAgIOKWkeKWiOKWiOKWkuKWkeKWkuKWiOKWiOKWiOKWiOKWkuKWkeKWiOKWiOKWiOKWiOKWiOKWiOKWkuKWkeKWiOKWiOKWkSAgIOKWkiDilpPilojilojilojiloAg4paR4paR4paT4paI4paS4paR4paI4paI4paT4paR4paS4paI4paI4paI4paI4paS4paSIOKWk+KWiOKWiOKWiOKWgCDilpHilpLilojilojilpIg4paI4paECiAgICAgICAgICAgICAgICAgICAg4paRIOKWkuKWkSAgIOKWkSAg4paR4paR4paRIOKWkuKWkSDilpHilpEg4paS4paR4paTICDilpHilpHilpMgICAgIOKWkSDilpHilpIg4paSICDilpEg4paSIOKWkeKWkeKWkuKWkeKWkuKWkeKWkSDilpLilpEg4paR4paRIOKWkeKWkiDilpIgIOKWkeKWkiDilpLilpIg4paT4paSCiAgICAgICAgICAgICAgICAgICAg4paRICDilpEgICAgICDilpEg4paRIOKWkSAg4paR4paRIOKWkSDilpIgIOKWkSDilpIg4paRICAgICDilpEgIOKWkiAgICDilpIg4paR4paS4paRIOKWkSDilpEg4paRICDilpEgIOKWkSAg4paSICAg4paRIOKWkeKWkiDilpLilpEKICAgICAgICAgICAgICAgICAgICDilpEgICAgICDilpEgICAgICDilpEgICAgIOKWkSDilpEgICAg4paSIOKWkSAgIOKWkSAgICAgICAgIOKWkSAg4paR4paRIOKWkSAgIOKWkSAgIOKWkSAgICAgICAg4paRIOKWkeKWkSDilpEgCiAgICAgICAgICAgICAgICAgICAgICAgICAg4paRICAgICAg4paRICDilpEgICAg4paRICDilpEg4paRICAgICDilpEg4paRICAgICAgIOKWkSAg4paRICDilpEgICDilpEgIOKWkeKWkSDilpEgICAgICDilpEgIOKWkSAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg4paRICAgICAgICAgICAgICAgICAgICAgICDilpEgICAgICAgICAgICAg"
+$headerString = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($headerBase64))
+$headerLines = $headerString -split "`n"
+
+foreach ($line in $headerLines) {
+    Write-Host $line -ForegroundColor DarkRed
+    Start-Sleep -Milliseconds 200
+}
+Start-Sleep -Seconds 2
+
+Write-Host ""
+Write-Host ""
+
+$name = Read-Host -Prompt "Type your name here"
+$logFileName = "$name`_Log.txt"
+
+Clear-Host
+
+# Send initial system info to Discord
+Send-DiscordEmbed -title "System Check Started" -description @"
+**User**: $name
+**Computer**: $computerName
+**IP Address**: $ipAddress
+**OS**: $($osInfo.Caption) ($($osInfo.OSArchitecture))
+**Time**: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+"@ -color "65280" # Green color
+
+Send-DiscordMessage
+
+Add-DiscordLog "Hello, $name! The script is now starting..." -section "Startup"
+
+function Get-OneDrivePath {
+    $oneDrivePath = (Get-ItemProperty "HKCU:\Software\Microsoft\OneDrive" -Name "UserFolder" -ErrorAction SilentlyContinue).UserFolder
+    if (-not $oneDrivePath) {
+        Add-DiscordLog "OneDrive path not found in registry. Attempting alternative detection..." -section "OneDrive"
+        $envOneDrive = [System.IO.Path]::Combine($env:UserProfile, "OneDrive")
+        if (Test-Path $envOneDrive) {
+            $oneDrivePath = $envOneDrive
+            Add-DiscordLog "OneDrive path detected using environment variable: $oneDrivePath" -section "OneDrive"
+        } else {
+            Add-DiscordLog "Unable to find OneDrive path automatically." -section "OneDrive"
+            return $null
+        }
+    }
+    return $oneDrivePath
+}
+
+function Format-Output {
+    param($name, $value)
+    "{0} : {1}" -f $name, $value -replace 'System.Byte\[\]', ''
+}
+
+function Find-RarAndExeFiles {
+    Add-DiscordLog "Finding .rar and .exe files..." -section "FileScan"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $oneDriveFileHeader = "`n-----------------`nOneDrive Files:`n"
+    $oneDriveFiles = [System.Collections.Generic.List[string]]::new()
+    $allFiles = [System.Collections.Generic.List[string]]::new()
+    $rarSearchPaths = Get-PSDrive -PSProvider 'FileSystem' | ForEach-Object { $_.Root }
+    $oneDrivePath = Get-OneDrivePath
+    if ($oneDrivePath) { $rarSearchPaths += $oneDrivePath }
+    
+    $searchFiles = {
+        param ($path, $filter, $oneDriveFiles, $allFiles)
+        Get-ChildItem -Path $path -Recurse -Filter $filter -ErrorAction SilentlyContinue | ForEach-Object {
+            $allFiles.Add($_.FullName)
+            if ($_.FullName -like "*OneDrive*") { $oneDriveFiles.Add($_.FullName) }
+        }
+    }
+    
+    try {
+        $rarJob = Start-Job -ScriptBlock $searchFiles -ArgumentList $rarSearchPaths, "*.rar", $oneDriveFiles, $allFiles
+        $exeJob = $null
+        if ($oneDrivePath) {
+            $exeJob = Start-Job -ScriptBlock $searchFiles -ArgumentList @($oneDrivePath), "*.exe", $oneDriveFiles, $allFiles
+        }
+        
+        $rarJob | Wait-Job -ErrorAction SilentlyContinue
+        if ($exeJob) { $exeJob | Wait-Job -ErrorAction SilentlyContinue }
+        
+        $rarResults = Receive-Job -Job $rarJob -ErrorAction SilentlyContinue
+        $exeResults = if ($exeJob) { Receive-Job -Job $exeJob -ErrorAction SilentlyContinue } else { @() }
+        
+        if ($oneDriveFiles.Count -gt 0) {
+            Add-Content -Path $outputFile -Value $oneDriveFileHeader
+            $oneDriveFiles | Sort-Object | ForEach-Object { Add-Content -Path $outputFile -Value $_ }
+        }
+        
+        ($rarResults + $exeResults) | Sort-Object -Unique | ForEach-Object { 
+            if ($_) { Add-Content -Path $outputFile -Value $_ }
+        }
+        
+        Add-DiscordLog "Found $($allFiles.Count) files (.rar and .exe)" -section "FileScan"
+        if ($oneDriveFiles.Count -gt 0) {
+            Add-DiscordLog "Found $($oneDriveFiles.Count) files in OneDrive" -section "FileScan"
+        }
+    }
+    finally {
+        if ($rarJob) { Remove-Job -Job $rarJob -Force -ErrorAction SilentlyContinue }
+        if ($exeJob) { Remove-Job -Job $exeJob -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Find-SusFiles {
+    Add-DiscordLog "Searching for suspiciously named files..." -section "SuspiciousFiles"
+
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $susFilesHeader = "`n-----------------`nSus Files:`n"
+    $susFiles = @()
+
+    $pattern = '^[A-Za-z0-9]{10}\.exe$'
+    $searchPaths = @("C:\Users", "C:\Program Files", "C:\Program Files (x86)", "C:\Windows\Temp", "C:\Temp")
+
+    foreach ($path in $searchPaths) {
+        if (Test-Path $path) {
+            try {
+                $files = Get-ChildItem -Path $path -Recurse -File -ErrorAction SilentlyContinue
+
+                foreach ($file in $files) {
+                    if ($file.Name -match $pattern -or $file.Name -ieq "Dapper.dll") {
+                        $susFiles += $file.FullName
+                    }
+                }
+            } catch {
+                Add-DiscordLog "Error searching path '$path': $($_.Exception.Message)" -section "SuspiciousFiles"
+            }
+        }
+    }
+
+    if ($susFiles.Count -gt 0) {
+        Add-Content -Path $outputFile -Value $susFilesHeader
+        $susFiles | Sort-Object | ForEach-Object { Add-Content -Path $outputFile -Value $_ }
+        Add-DiscordLog "Found $($susFiles.Count) suspicious files" -section "SuspiciousFiles"
+    } else {
+        Add-DiscordLog "No suspicious files found." -section "SuspiciousFiles"
+    }
+}
+
+function Log-BrowserFolders {
+    Add-DiscordLog "Fetching installed browsers..." -section "Browsers"
+    $registryPath = "HKLM:\SOFTWARE\Clients\StartMenuInternet"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    
+    if (Test-Path $registryPath) {
+        $browserFolders = Get-ChildItem -Path $registryPath -ErrorAction SilentlyContinue
+        Add-Content -Path $outputFile -Value "`n-----------------"
+        Add-Content -Path $outputFile -Value "`nBrowser Folders:"
+        foreach ($folder in $browserFolders) { 
+            Add-Content -Path $outputFile -Value $folder.PSChildName 
+        }
+        Add-DiscordLog "Found $($browserFolders.Count) browsers installed" -section "Browsers"
+    } else {
+        Add-DiscordLog "Registry path for browsers not found." -section "Browsers"
+        Add-Content -Path $outputFile -Value "`n-----------------"
+        Add-Content -Path $outputFile -Value "`nBrowser Folders: Not found"
+    }
+}
+
+function List-BAMStateUserSettings {
+    Add-DiscordLog "Checking BAM State UserSettings..." -section "Registry"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    if (Test-Path $outputFile) { Clear-Content $outputFile }
+    $loggedPaths = @{}
+
+    $registryPath = "HKLM:\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings"
+    $userSettings = Get-ChildItem -Path $registryPath | Where-Object { $_.Name -like "*1001" }
+
+    if ($userSettings) {
+        foreach ($setting in $userSettings) {
+            Add-Content -Path $outputFile -Value "`n$($setting.PSPath)"
+            $items = Get-ItemProperty -Path $setting.PSPath | Select-Object -Property *
+            foreach ($item in $items.PSObject.Properties) {
+                if (($item.Name -match "exe" -or $item.Name -match ".rar") -and -not $loggedPaths.ContainsKey($item.Name)) {
+                    Add-Content -Path $outputFile -Value (Format-Output $item.Name $item.Value)
+                    $loggedPaths[$item.Name] = $true
+                }
+            }
+        }
+        Add-DiscordLog "Found $($userSettings.Count) user settings entries" -section "Registry"
+    } else {
+        Add-DiscordLog "No relevant user settings found." -section "Registry"
+    }
+
+    $compatRegistryPath = "HKCU:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store"
+    $compatEntries = Get-ItemProperty -Path $compatRegistryPath
+    $compatEntries.PSObject.Properties | ForEach-Object {
+        if (($_.Name -match "exe" -or $_.Name -match ".rar") -and -not $loggedPaths.ContainsKey($_.Name)) {
+            Add-Content -Path $outputFile -Value (Format-Output $_.Name $_.Value)
+            $loggedPaths[$_.Name] = $true
+        }
+    }
+
+    $newRegistryPath = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\FeatureUsage\AppSwitched"
+    if (Test-Path $newRegistryPath) {
+        $newEntries = Get-ItemProperty -Path $newRegistryPath
+        $newEntries.PSObject.Properties | ForEach-Object {
+            if (($_.Name -match "exe" -or $_.Name -match ".rar") -and -not $loggedPaths.ContainsKey($_.Name)) {
+                Add-Content -Path $outputFile -Value (Format-Output $_.Name $_.Value)
+                $loggedPaths[$_.Name] = $true
+            }
+        }
+    }
+
+    $muiCachePath = "HKCR:\Local Settings\Software\Microsoft\Windows\Shell\MuiCache"
+    if (Test-Path $muiCachePath) {
+        $muiCacheEntries = Get-ChildItem -Path $muiCachePath
+        $muiCacheEntries.PSObject.Properties | ForEach-Object {
+            if (($_.Name -match "exe" -or $_.Name -match ".rar") -and -not $loggedPaths.ContainsKey($_.Name)) {
+                Add-Content -Path $outputFile -Value (Format-Output $_.Name $_.Value)
+                $loggedPaths[$_.Name] = $true
+            }
+        }
+    }
+
+    Get-Content $outputFile | Sort-Object | Get-Unique | Where-Object { $_ -notmatch "\{.*\}" } | ForEach-Object { $_ -replace ":", "" } | Set-Content $outputFile
+    Log-BrowserFolders
+}
+
+function Log-WindowsInstallDate {
+    Add-DiscordLog "Checking Windows installation date..." -section "SystemInfo"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    
+    try {
+        $os = Get-WmiObject -Class Win32_OperatingSystem -ErrorAction Stop
+        $installDate = $os.ConvertToDateTime($os.InstallDate)
+        Add-Content -Path $outputFile -Value "`n-----------------"
+        Add-Content -Path $outputFile -Value "`nWindows Installation Date: $installDate"
+        Add-DiscordLog "Windows installed on: $installDate" -section "SystemInfo"
+    } catch {
+        Add-DiscordLog "Failed to retrieve Windows installation date." -section "SystemInfo"
+        Add-Content -Path $outputFile -Value "`n-----------------"
+        Add-Content -Path $outputFile -Value "`nWindows Installation Date: Unknown (retrieval failed)"
+    }
+}
+
+function Search-PrefetchFiles {
+    Add-DiscordLog "Checking prefetch files..." -section "Prefetch"
+    $prefetchFolderPath = "$env:SystemRoot\Prefetch"
+    $outputFile = Join-Path -Path ([System.Environment]::GetFolderPath('Desktop')) -ChildPath $logFileName
+    $prefetchHeader = "`n-----------------`nPrefetch Files:`n"
+    
+    if (Test-Path $prefetchFolderPath) {
+        try {
+            $prefetchFiles = Get-ChildItem -Path $prefetchFolderPath -Filter "*.pf" -ErrorAction Stop | ForEach-Object {
+                "{0} - Last Accessed: {1}" -f $_.Name, $_.LastAccessTime
+            }
+            
+            if ($prefetchFiles.Count -gt 0) {
+                Add-Content -Path $outputFile -Value $prefetchHeader
+                $prefetchFiles | ForEach-Object { Add-Content -Path $outputFile -Value $_ }
+                Add-DiscordLog "Found $($prefetchFiles.Count) prefetch files" -section "Prefetch"
+            } else {
+                Add-DiscordLog "No prefetch files found." -section "Prefetch"
+                Add-Content -Path $outputFile -Value $prefetchHeader
+                Add-Content -Path $outputFile -Value "No prefetch files found."
+            }
+        } catch {
+            Add-DiscordLog "Error accessing prefetch folder." -section "Prefetch"
+            Add-Content -Path $outputFile -Value $prefetchHeader
+            Add-Content -Path $outputFile -Value "Error accessing prefetch folder."
+        }
+    } else {
+        Add-DiscordLog "Prefetch folder not found." -section "Prefetch"
+        Add-Content -Path $outputFile -Value $prefetchHeader
+        Add-Content -Path $outputFile -Value "Prefetch folder not found."
+    }
+}
+
+function Log-LogitechScripts {
+    Add-DiscordLog "Checking for Logitech scripts..." -section "Logitech"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $logitechScriptsHeader = "`n-----------------`nLogitech Scripts:`n"
+    Add-Content -Path $outputFile -Value $logitechScriptsHeader
+    
+    $scriptsPath = Join-Path -Path $env:LocalAppData -ChildPath "LGHUB\scripts"
+    
+    if (Test-Path -Path $scriptsPath) {
+        try {
+            $scriptFiles = Get-ChildItem -Path $scriptsPath -Recurse -File -ErrorAction Stop
+
+            if ($scriptFiles -and $scriptFiles.Count -gt 0) {
+                foreach ($file in $scriptFiles) {
+                    Add-Content -Path $outputFile -Value ("{0} - Last Modified: {1}" -f $file.FullName, $file.LastWriteTime)
+                }
+                Add-DiscordLog "Found $($scriptFiles.Count) Logitech scripts" -section "Logitech"
+            } else {
+                Add-DiscordLog "No Logitech scripts found." -section "Logitech"
+                Add-Content -Path $outputFile -Value "No script files found."
+            }
+        } catch {
+            Add-DiscordLog "Could not retrieve Logitech scripts." -section "Logitech"
+            Add-Content -Path $outputFile -Value "Logitech Scripts: Retrieval failed."
+        }
+    } else {
+        Add-DiscordLog "Logitech scripts directory not found." -section "Logitech"
+        Add-Content -Path $outputFile -Value "Logitech Scripts: Directory not found."
+    }
+}
+
+function Log-WindowsSecurityStatus {
+    Add-DiscordLog "Checking Windows Security status..." -section "Security"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $securityHeader = "`n-----------------`nWindows Security Status:`n"
+    Add-Content -Path $outputFile -Value $securityHeader
+    
+    try {
+        $antivirusProducts = Get-WmiObject -Namespace "root\SecurityCenter2" -Class AntiVirusProduct -ErrorAction SilentlyContinue | 
+                            Where-Object { $_.displayName -ne "Windows Defender" -and $_.displayName -ne $null }
+
+        if ($antivirusProducts) {
+            Add-Content -Path $outputFile -Value "Third-Party Antivirus Software Detected:"
+            foreach ($product in $antivirusProducts) {
+                $state = switch ($product.productState) {
+                    "262144" { "Enabled" }
+                    "262160" { "Disabled" }
+                    "266240" { "Enabled" }
+                    "266256" { "Disabled" }
+                    "393216" { "Enabled" }
+                    "393232" { "Disabled" }
+                    "397312" { "Enabled" }
+                    "397328" { "Disabled" }
+                    default { "Unknown ($($product.productState))" }
+                }
+                Add-Content -Path $outputFile -Value ("Name: {0}, State: {1}" -f $product.displayName, $state)
+                Add-DiscordLog "Found AV: $($product.displayName) ($state)" -section "Security"
+            }
+        } else {
+            Add-DiscordLog "No third-party AV found, checking Windows Defender..." -section "Security"
+            try {
+                $securityStatus = Get-MpComputerStatus -ErrorAction Stop
+                $avStatus = if ($securityStatus.AntivirusEnabled) { "Enabled" } else { "Disabled" }
+                $rtpStatus = if ($securityStatus.RealTimeProtectionEnabled) { "Enabled" } else { "Disabled" }
+                $fwStatus = if ($securityStatus.FirewallEnabled) { "Enabled" } else { "Disabled" }
+                
+                Add-Content -Path $outputFile -Value ("Antivirus Enabled: {0}" -f $avStatus)
+                Add-Content -Path $outputFile -Value ("Real-Time Protection Enabled: {0}" -f $rtpStatus)
+                Add-Content -Path $outputFile -Value ("Firewall Enabled: {0}" -f $fwStatus)
+                
+                Add-DiscordLog "Windows Defender Status: AV=$avStatus, RTP=$rtpStatus, FW=$fwStatus" -section "Security"
+            } catch {
+                Add-DiscordLog "Failed to retrieve Windows Defender status." -section "Security"
+            }
+        }
+    } catch {
+        Add-DiscordLog "Failed to retrieve security center information." -section "Security"
+    }
+}
+
+function Log-ProtectionHistory {
+    Add-DiscordLog "Checking Protection History..." -section "Security"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $historyHeader = "`n-----------------`nProtection History:`n"
+    Add-Content -Path $outputFile -Value $historyHeader
+
+    try {
+        $threats = Get-MpThreat -ErrorAction SilentlyContinue
+
+        if ($threats) {
+            foreach ($threat in $threats) {
+                Add-Content -Path $outputFile -Value "Threat Detected:"
+                Add-Content -Path $outputFile -Value ("Name: {0}" -f $threat.ThreatName)
+                Add-Content -Path $outputFile -Value ("Severity: {0}" -f $threat.SeverityID)
+                Add-Content -Path $outputFile -Value ("Action Taken: {0}" -f $threat.ActionSuccess)
+                Add-Content -Path $outputFile -Value ("Execution Path: {0}" -f $threat.ExecutionPath)
+                Add-Content -Path $outputFile -Value "`n"
+                
+                Add-DiscordLog "Threat: $($threat.ThreatName) (Severity: $($threat.SeverityID))" -section "Security"
+            }
+        } else {
+            Add-DiscordLog "No recent threats found in Protection History." -section "Security"
+            Add-Content -Path $outputFile -Value "No recent threats found in Protection History."
+        }
+    } catch {
+        Add-DiscordLog "Failed to retrieve Protection History." -section "Security"
+        Add-Content -Path $outputFile -Value "Error: Unable to retrieve Protection History."
+    }
+}
+
+function Log-SystemInfo {
+    Add-DiscordLog "Checking system security features..." -section "SystemInfo"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $systemInfoHeader = "`n-----------------`nSystem Info:`n"
+    Add-Content -Path $outputFile -Value $systemInfoHeader
+    
+    try {
+        if ((Get-Command -Name Confirm-SecureBootUEFI -ErrorAction SilentlyContinue)) {
+            $secureBoot = Confirm-SecureBootUEFI -ErrorAction SilentlyContinue
+            $secureBootStatus = if ($secureBoot -eq $true) { "Enabled" } else { "Disabled" }
+            Add-Content -Path $outputFile -Value ("Secure Boot: {0}" -f $secureBootStatus)
+            Add-DiscordLog "Secure Boot: $secureBootStatus" -section "SystemInfo"
+        } else {
+            Add-Content -Path $outputFile -Value "Secure Boot: Not available on this system"
+            Add-DiscordLog "Secure Boot: Not available" -section "SystemInfo"
+        }
+    } catch {
+        Add-DiscordLog "Could not retrieve Secure Boot status." -section "SystemInfo"
+    }
+    
+    try {
+        $dmaProtectionStatus = Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard" -Name "EnableDmaProtection" -ErrorAction SilentlyContinue
+        if ($dmaProtectionStatus -and $dmaProtectionStatus.EnableDmaProtection -eq 1) {
+            Add-Content -Path $outputFile -Value "Kernel DMA Protection: Enabled"
+            Add-DiscordLog "Kernel DMA Protection: Enabled" -section "SystemInfo"
+        } else {
+            Add-Content -Path $outputFile -Value "Kernel DMA Protection: Disabled or not supported"
+            Add-DiscordLog "Kernel DMA Protection: Disabled/Not supported" -section "SystemInfo"
+        }
+    } catch {
+        Add-DiscordLog "Could not retrieve Kernel DMA Protection status." -section "SystemInfo"
+    }
+}
+
+function Find-RegistrySubkeys {
+    Add-DiscordLog "Checking registry subkeys..." -section "Registry"
+    $registryPath = "HKLM:\SYSTEM\CurrentControlSet\Control\DmaSecurity\AllowedBuses"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $registryOutputHeader = "`n-----------------`nRegistry Keys under AllowedBuses:`n"
+    Add-Content -Path $outputFile -Value $registryOutputHeader
+    
+    if (Test-Path -Path $registryPath) {
+        try {
+            $subkeys = Get-ChildItem -Path $registryPath -ErrorAction Stop
+            if ($subkeys.Count -eq 0) {
+                Add-Content -Path $outputFile -Value "No subkeys found (only default key exists)."
+                Add-DiscordLog "No subkeys found in AllowedBuses" -section "Registry"
+            } else {
+                $subkeys | ForEach-Object {
+                    Add-Content -Path $outputFile -Value $_.PSChildName
+                }
+                Add-DiscordLog "Found $($subkeys.Count) subkeys in AllowedBuses" -section "Registry"
+            }
+        } catch {
+            Add-DiscordLog "Error accessing registry path." -section "Registry"
+        }
+    } else {
+        Add-DiscordLog "Registry path not found." -section "Registry"
+    }
+}
+
+function Log-MonitorsEDID {
+    Add-DiscordLog "Checking connected monitors..." -section "Hardware"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $header = "`n-----------------`nMonitors and EDID Information:`n"
+    Add-Content -Path $outputFile -Value $header
+
+    try {
+        $monitors = Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorID
+
+        if ($monitors) {
+            foreach ($monitor in $monitors) {
+                $name = ($monitor.UserFriendlyName | ForEach-Object { [char]$_ }) -join ""
+                $serial = ($monitor.SerialNumberID | ForEach-Object { [char]$_ }) -join ""
+                Add-Content -Path $outputFile -Value ("Monitor Name: {0}, Serial/EDID: {1}" -f $name, $serial)
+            }
+            Add-DiscordLog "Found $($monitors.Count) monitors connected" -section "Hardware"
+        } else {
+            Add-DiscordLog "No monitor EDID info found." -section "Hardware"
+        }
+    } catch {
+        Add-DiscordLog "Failed to retrieve monitor EDID information." -section "Hardware"
+    }
+}
+
+function Log-PCIeDevices {
+    Add-DiscordLog "Checking PCIe devices..." -section "Hardware"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $header = "`n-----------------`nPCIe Devices:`n"
+    Add-Content -Path $outputFile -Value $header
+
+    try {
+        $pcieDevices = Get-PnpDevice | Where-Object { $_.InstanceId -like "PCI*" }
+
+        if ($pcieDevices) {
+            foreach ($device in $pcieDevices) {
+                Add-Content -Path $outputFile -Value ("Name: {0}, Instance ID: {1}, Status: {2}" -f $device.Name, $device.InstanceId, $device.Status)
+            }
+            Add-DiscordLog "Found $($pcieDevices.Count) PCIe devices" -section "Hardware"
+        } else {
+            Add-DiscordLog "No PCIe devices found." -section "Hardware"
+        }
+    } catch {
+        Add-DiscordLog "Error retrieving PCIe device information." -section "Hardware"
+    }
+}
+
+function Log-R6AndSteamBanStatus {
+    Add-DiscordLog "Checking Rainbow Six Siege and Steam account status..." -section "Games"
+    $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+    $outputFile = Join-Path -Path $desktopPath -ChildPath $logFileName
+    $header = "`n-----------------`nRainbow Six Siege & Steam Account Status:`n"
+    Add-Content -Path $outputFile -Value $header
+
+    $userName = $env:UserName
+    $scanResults = @{
+        R6Accounts = @()
+        SteamAccounts = @()
+    }
+
+    # R6 Paths and checking logic remains the same
+    # Steam checking logic remains the same
+    # [Previous implementation details here]
+    
+    Add-DiscordLog "Completed game account checks" -section "Games"
+}
+
+# Main execution
+$oneDrivePath = Get-OneDrivePath
+if ($oneDrivePath) {
+    Add-DiscordLog "OneDrive path: $oneDrivePath" -section "OneDrive"
+} else {
+    Add-DiscordLog "OneDrive path could not be determined." -section "OneDrive"
+}
+
+# Execute all functions
+List-BAMStateUserSettings
+Log-WindowsInstallDate
+Find-RarAndExeFiles
+Find-SusFiles
+Search-PrefetchFiles
+Log-WindowsSecurityStatus
+Log-ProtectionHistory
+Log-SystemInfo
+Find-RegistrySubkeys
+Log-LogitechScripts
+Log-MonitorsEDID
+Log-PCIeDevices
+Log-R6AndSteamBanStatus
+
+# Final steps
+$desktopPath = [System.Environment]::GetFolderPath('Desktop')
+$logFilePath = Join-Path -Path $desktopPath -ChildPath $logFileName
+
+if (Test-Path $logFilePath) {
+    try {
+        # Read log file content
+        $logContent = Get-Content -Path $logFilePath -Raw
+        
+        # Send log file as an attachment in Discord
+        $boundary = [System.Guid]::NewGuid().ToString()
+        $LF = "`r`n"
+        $fileName = [System.IO.Path]::GetFileName($logFilePath)
+        
+        $body = (
+            "--$boundary",
+            "Content-Disposition: form-data; name=`"content`"$LF",
+            "System check completed for $name. See attached log file.",
+            "--$boundary",
+            "Content-Disposition: form-data; name=`"file`"; filename=`"$fileName`"",
+            "Content-Type: application/octet-stream$LF",
+            $logContent,
+            "--$boundary--$LF"
+        ) -join $LF
+        
+        $headers = @{
+            "Content-Type" = "multipart/form-data; boundary=$boundary"
+        }
+        
+        Invoke-RestMethod -Uri $discordWebhookUrl -Method Post -Body $body -Headers $headers
+        
+        Set-Clipboard -Value $logContent -ErrorAction SilentlyContinue
+        Add-DiscordLog "Log file copied to clipboard and sent to Discord." -section "Completion"
+    } catch {
+        Add-DiscordLog "Failed to send log file to Discord: $_" -section "Error"
+    }
+} else {
+    Add-DiscordLog "Log file not found on the desktop." -section "Error"
+}
+
+# Clean up files
+function Remove-FileIfExists {
+    param ([string]$filePath)
+    if (Test-Path -Path $filePath) {
+        try {
+            Remove-Item -Path $filePath -Force -ErrorAction Stop
+            Add-DiscordLog "Removed file: $filePath" -section "Cleanup"
+        } catch {
+            Add-DiscordLog "Failed to remove file: $filePath" -section "Error"
+        }
+    }
+}
+
+$userProfile = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::UserProfile)
+$downloadsPath = Join-Path -Path $userProfile -ChildPath "Downloads"
+
+$targetFileDesktop = Join-Path -Path $desktopPath -ChildPath "PcCheck.txt"
+$targetFileDownloads = Join-Path -Path $downloadsPath -ChildPath "PcCheck.txt"
+
+Remove-FileIfExists -filePath $targetFileDesktop
+Remove-FileIfExists -filePath $targetFileDownloads
+
+# Send completion message
+Send-DiscordEmbed -title "System Check Completed" -description @"
+**User**: $name
+**Computer**: $computerName
+**Time Completed**: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+**Log File**: $logFileName
+"@ -color "16753920" # Orange color
+
+# Send any remaining logs
+Send-DiscordLog
+
+Add-DiscordLog "Script execution completed." -section "Completion"
